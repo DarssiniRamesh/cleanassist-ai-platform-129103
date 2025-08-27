@@ -2,10 +2,10 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError, model_validator
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from src.api.training import TrainingResult, train_from_upload
-from src.api.inference import predict_with_latest_model
+from src.api.inference import predict_recommended_minutes
 
 openapi_tags = [
     {
@@ -62,18 +62,9 @@ class InferenceRequest(BaseModel):
         return self
 
 
-class InferenceResponse(BaseModel):
-    """Prediction results for submitted records."""
-    model_id: str = Field(..., description="Model used for inference.")
-    task_type: str = Field(..., description="Task type used by the model.")
-    count: int = Field(..., description="Number of predictions returned.")
-    predictions: List[Any] = Field(..., description="Predicted values for each record.")
-    probabilities: Optional[List[List[float]]] = Field(
-        default=None, description="Class probabilities if available (classification only)."
-    )
-    classes: Optional[List[str]] = Field(
-        default=None, description="Predicted class order corresponding to probability columns."
-    )
+class RecommendedMinutesResponse(BaseModel):
+    """Minimal response containing only the recommended cleaning time in minutes."""
+    recommended_minutes: int = Field(..., description="Recommended cleaning duration in minutes.")
 
 
 @app.get("/", tags=["Health"], summary="Health Check")
@@ -106,7 +97,8 @@ def api_docs_info():
                 "method": "POST",
                 "path": "/ai/infer",
                 "content_type": "application/json",
-                "body_example": {"records": [{"feature1": 1, "feature2": "A"}]},
+                "body_example": {"records": [{"home_size_sqft": 1200, "pets_count": 1, "clutter_level": "medium"}]},
+                "response_example": {"recommended_minutes": 75}
             },
         },
         "note": "If you see 'Cannot POST /ai/train', ensure your request is sent to this backend service URL (not a frontend URL) and that the server is running.",
@@ -182,19 +174,22 @@ async def train_endpoint(
 @app.post(
     "/ai/infer",
     tags=["AI Training"],
-    summary="Run inference on user-provided cases",
+    summary="Infer recommended cleaning minutes",
     description="""
-Send a JSON body of one or more cases (feature dicts) to get predictions from the latest trained model.
+Send a JSON body with one or more cases (feature dicts) to get a single recommended cleaning time (in minutes)
+from the latest trained model. If multiple records are provided, the first record will be used.
 
-Request body:
+Request body example:
 {
   "records": [
-    { "feature1": 1, "feature2": "A", ... },
-    { "feature1": 5, "feature2": "B", ... }
+    { "home_size_sqft": 1200, "pets_count": 1, "clutter_level": "medium" }
   ]
 }
+
+Response example:
+{ "recommended_minutes": 75 }
     """,
-    response_model=InferenceResponse,
+    response_model=RecommendedMinutesResponse,
     responses={
         200: {"description": "Inference completed successfully."},
         400: {"description": "Invalid input or no trained model."},
@@ -203,24 +198,20 @@ Request body:
 )
 async def infer_endpoint(payload: InferenceRequest = Body(...)) -> JSONResponse:
     """
-    Perform prediction using the latest trained model artifact.
+    Perform prediction using the latest trained model artifact and return only the recommended cleaning time in minutes.
 
     Parameters:
         payload: InferenceRequest containing a 'records' list of feature dictionaries.
 
     Returns:
-        JSON with predictions, and optionally probabilities/classes for classification models.
+        JSON with a single field: {"recommended_minutes": <int>}.
     """
     try:
-        # Additional validation safety net
         if not payload.records:
             raise HTTPException(status_code=400, detail="records must be a non-empty list.")
 
-        result = predict_with_latest_model(records=payload.records)
-
-        # Response model will enforce JSON-serializable structures; any non-serializable values should have been sanitized.
-        response = InferenceResponse(**result)
-        # Use model_dump to ensure standard types; by default pydantic will convert numpy types.
+        minutes = predict_recommended_minutes(records=payload.records)
+        response = RecommendedMinutesResponse(recommended_minutes=minutes)
         return JSONResponse(status_code=200, content=response.model_dump())
     except (ValidationError, FileNotFoundError) as err:
         detail = str(err)

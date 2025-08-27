@@ -1,0 +1,21 @@
+{
+  "model_id": "a6be952c-a656-41e8-9bdb-03e9ef40b48e",
+  "created_at": "2025-08-27T10:22:24.921370",
+  "task_type": "regression",
+  "target_column": "rooms",
+  "feature_columns": [
+    "home_size_sqft",
+    "pets_count",
+    "duration_minutes",
+    "clutter_level_high",
+    "clutter_level_low",
+    "clutter_level_medium"
+  ],
+  "metrics": {
+    "mae": 0.127,
+    "r2": 0.8857,
+    "n_features": 6,
+    "n_samples": 50
+  },
+  "source_filename": "sample_dataset.csv"
+}

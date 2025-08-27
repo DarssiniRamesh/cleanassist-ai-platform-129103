@@ -131,97 +131,15 @@ def _is_finite_number(x: Any) -> bool:
         return False
 
 
-def _sanitize_number(x: Any) -> Any:
-    """Convert non-finite numeric values (nan/inf) to None; pass through other JSON-safe scalars."""
-    if isinstance(x, (np.integer,)):
-        return int(x)
-    if isinstance(x, (np.floating, float, int)):
-        return float(x) if _is_finite_number(x) else None
-    if isinstance(x, (np.bool_, bool)):
-        return bool(x)
-    # Strings and other JSON-safe types pass through as-is
-    return x
-
-
-def _sanitize_array(arr: Any) -> List[Any]:
-    """Convert numpy arrays or sequences to plain Python lists and sanitize elements."""
-    if isinstance(arr, np.ndarray):
-        arr = arr.tolist()
-    if isinstance(arr, (list, tuple)):
-        return [_sanitize_number(v) if not isinstance(v, (list, tuple)) else _sanitize_array(v) for v in arr]
-    # Single scalar
-    return [_sanitize_number(arr)]
-
-
-def _sanitize_result_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """Ensure the result dict contains only JSON-serializable, finite values."""
-    out: Dict[str, Any] = {}
-
-    # Required simple fields
-    out["model_id"] = str(payload.get("model_id") or "")
-    out["task_type"] = str(payload.get("task_type") or "")
-    out["count"] = int(payload.get("count") or 0)
-
-    # Predictions
-    preds = payload.get("predictions", [])
-    preds = preds.tolist() if isinstance(preds, np.ndarray) else list(preds)
-    out["predictions"] = [_sanitize_number(v) for v in preds]
-
-    # Probabilities (optional)
-    probas = payload.get("probabilities", None)
-    if probas is not None:
-        if isinstance(probas, np.ndarray):
-            probas = probas.tolist()
-        # Ensure 2D list and sanitize
-        if isinstance(probas, list):
-            out["probabilities"] = [
-                [_sanitize_number(v) for v in (row if isinstance(row, list) else [row])]
-                for row in probas
-            ]
-        else:
-            out["probabilities"] = None
-    else:
-        out["probabilities"] = None
-
-    # Classes (optional)
-    classes = payload.get("classes", None)
-    if classes is not None:
-        try:
-            out["classes"] = [str(c) for c in (classes.tolist() if isinstance(classes, np.ndarray) else list(classes))]
-        except Exception:
-            out["classes"] = None
-    else:
-        out["classes"] = None
-
-    return out
-
-
 # PUBLIC_INTERFACE
-def load_latest_model() -> LoadedModel:
-    """Load the latest trained model and its metadata for inference."""
-    model_path, meta_path = _get_latest_model_paths()
-    meta = _read_metadata(meta_path)
-    model = joblib.load(model_path)
+def predict_recommended_minutes(records: List[Dict[str, Any]]) -> int:
+    """Predict the recommended cleaning duration (in minutes) for the first record in the payload.
 
-    return LoadedModel(
-        model_id=str(meta.get("model_id")),
-        model_path=model_path,
-        task_type=str(meta.get("task_type")),
-        target_column=str(meta.get("target_column")),
-        feature_columns=list(meta.get("feature_columns", [])),
-        created_at=str(meta.get("created_at")),
-    ).model_copy(update={"model": model})  # Attach model via dynamic attr
-
-
-# PUBLIC_INTERFACE
-def predict_with_latest_model(records: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Perform inference using the latest trained model.
-
-    Args:
-        records: List of user records (feature dicts).
-
-    Returns:
-        Dict containing model_id, task_type, predictions, and optional probabilities for classification.
+    Notes:
+    - Uses the latest trained model.
+    - If the model is classification-type, returns the predicted class mapped to an int if possible.
+    - If multiple records are provided, only the first is used for the recommendation to keep the
+      API focused and minimal.
     """
     # Load model and meta
     model_path, meta_path = _get_latest_model_paths()
@@ -232,30 +150,44 @@ def predict_with_latest_model(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     if not feature_columns:
         raise ValueError("Model metadata missing feature_columns; cannot align input.")
 
-    X = _align_features(records, feature_columns)
+    if not records:
+        raise ValueError("Empty input: provide at least one record.")
 
-    # Run model prediction
+    # Use only the first record for a single recommended_minutes output
+    first_record = records[0:1]
+    X = _align_features(first_record, feature_columns)
+
+    # Predict
     preds = model.predict(X)
+    value = preds[0] if isinstance(preds, (list, np.ndarray)) else preds
 
-    result: Dict[str, Any] = {
-        "model_id": meta.get("model_id"),
-        "task_type": meta.get("task_type"),
-        "count": int(len(X)),
-        "predictions": preds.tolist() if isinstance(preds, np.ndarray) else list(preds),
-    }
+    # Normalize to integer minutes
+    # - If numeric: round to nearest int; clamp to non-negative
+    # - If string/label: attempt to parse to number; else set to 0
+    minutes: int
+    try:
+        num = float(value)
+        if not np.isfinite(num):
+            minutes = 0
+        else:
+            minutes = int(round(num))
+    except Exception:
+        # Handle non-numeric classes (e.g., "short", "medium", "long")
+        label = str(value).strip().lower()
+        mapping = {
+            "very short": 15,
+            "short": 30,
+            "medium": 60,
+            "long": 90,
+            "very long": 120,
+        }
+        minutes = mapping.get(label, 0)
 
-    # If classifier supports predict_proba, include probabilities
-    if hasattr(model, "predict_proba"):
-        try:
-            probas = model.predict_proba(X)
-            result["probabilities"] = probas.tolist()
-            if hasattr(model, "classes_"):
-                result["classes"] = [str(c) for c in list(model.classes_)]
-        except Exception:
-            # If fails, silently ignore proba
-            result["probabilities"] = None
-            result["classes"] = result.get("classes", None)
+    # safety clamp
+    if minutes < 0:
+        minutes = 0
+    # Optionally, set a reasonable upper bound to avoid outrageous values
+    if minutes > 24 * 60:
+        minutes = 24 * 60
 
-    # Sanitize the payload to ensure JSON-serializable, finite values
-    safe_result = _sanitize_result_payload(result)
-    return safe_result
+    return minutes
