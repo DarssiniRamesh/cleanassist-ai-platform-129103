@@ -1,9 +1,11 @@
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from typing import Any, Dict, List, Optional
 
 from src.api.training import TrainingResult, train_from_upload
+from src.api.inference import predict_with_latest_model
 
 openapi_tags = [
     {
@@ -44,6 +46,25 @@ class TrainResponse(BaseModel):
     target_column: str = Field(..., description="Target column used for training.")
     metrics: dict = Field(default_factory=dict, description="Training metrics summary.")
     model_path: str = Field(..., description="Local storage path of the artifact.")
+
+
+class InferenceRequest(BaseModel):
+    """Input payload containing one or more user cases for prediction."""
+    records: List[Dict[str, Any]] = Field(..., description="List of feature dictionaries, each representing a case.")
+
+
+class InferenceResponse(BaseModel):
+    """Prediction results for submitted records."""
+    model_id: str = Field(..., description="Model used for inference.")
+    task_type: str = Field(..., description="Task type used by the model.")
+    count: int = Field(..., description="Number of predictions returned.")
+    predictions: List[Any] = Field(..., description="Predicted values for each record.")
+    probabilities: Optional[List[List[float]]] = Field(
+        default=None, description="Class probabilities if available (classification only)."
+    )
+    classes: Optional[List[str]] = Field(
+        default=None, description="Predicted class order corresponding to probability columns."
+    )
 
 
 @app.get("/", tags=["Health"], summary="Health Check")
@@ -115,3 +136,48 @@ async def train_endpoint(
     except Exception as e:
         # Log in real app; for now, return internal error
         raise HTTPException(status_code=500, detail=f"Training failed: {e}") from e
+
+
+# PUBLIC_INTERFACE
+@app.post(
+    "/ai/infer",
+    tags=["AI Training"],
+    summary="Run inference on user-provided cases",
+    description="""
+Send a JSON body of one or more cases (feature dicts) to get predictions from the latest trained model.
+
+Request body:
+{
+  "records": [
+    { "feature1": 1, "feature2": "A", ... },
+    { "feature1": 5, "feature2": "B", ... }
+  ]
+}
+    """,
+    response_model=InferenceResponse,
+    responses={
+        200: {"description": "Inference completed successfully."},
+        400: {"description": "Invalid input or no trained model."},
+        500: {"description": "Internal error during inference."},
+    },
+)
+async def infer_endpoint(payload: InferenceRequest = Body(...)) -> JSONResponse:
+    """
+    Perform prediction using the latest trained model artifact.
+
+    Parameters:
+        payload: InferenceRequest containing a 'records' list of feature dictionaries.
+
+    Returns:
+        JSON with predictions, and optionally probabilities/classes for classification models.
+    """
+    try:
+        result = predict_with_latest_model(records=payload.records)
+        response = InferenceResponse(**result)
+        return JSONResponse(status_code=200, content=response.model_dump())
+    except FileNotFoundError as fnf:
+        raise HTTPException(status_code=400, detail=str(fnf)) from fnf
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve)) from ve
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Inference failed: {e}") from e
