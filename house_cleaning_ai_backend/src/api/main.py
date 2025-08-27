@@ -1,7 +1,7 @@
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError, model_validator
 from typing import Any, Dict, List, Optional
 
 from src.api.training import TrainingResult, train_from_upload
@@ -51,6 +51,15 @@ class TrainResponse(BaseModel):
 class InferenceRequest(BaseModel):
     """Input payload containing one or more user cases for prediction."""
     records: List[Dict[str, Any]] = Field(..., description="List of feature dictionaries, each representing a case.")
+
+    @model_validator(mode="after")
+    def validate_records(self):
+        if not self.records or not isinstance(self.records, list):
+            raise ValueError("records must be a non-empty list of objects.")
+        for i, rec in enumerate(self.records):
+            if not isinstance(rec, dict):
+                raise ValueError(f"Record at index {i} must be an object/dict.")
+        return self
 
 
 class InferenceResponse(BaseModel):
@@ -203,11 +212,19 @@ async def infer_endpoint(payload: InferenceRequest = Body(...)) -> JSONResponse:
         JSON with predictions, and optionally probabilities/classes for classification models.
     """
     try:
+        # Additional validation safety net
+        if not payload.records:
+            raise HTTPException(status_code=400, detail="records must be a non-empty list.")
+
         result = predict_with_latest_model(records=payload.records)
+
+        # Response model will enforce JSON-serializable structures; any non-serializable values should have been sanitized.
         response = InferenceResponse(**result)
+        # Use model_dump to ensure standard types; by default pydantic will convert numpy types.
         return JSONResponse(status_code=200, content=response.model_dump())
-    except FileNotFoundError as fnf:
-        raise HTTPException(status_code=400, detail=str(fnf)) from fnf
+    except (ValidationError, FileNotFoundError) as err:
+        detail = str(err)
+        raise HTTPException(status_code=400, detail=detail) from err
     except ValueError as ve:
         raise HTTPException(status_code=400, detail=str(ve)) from ve
     except Exception as e:

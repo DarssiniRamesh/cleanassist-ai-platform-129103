@@ -1,5 +1,6 @@
 import glob
 import json
+import math
 import os
 from typing import Any, Dict, List, Tuple
 
@@ -115,7 +116,84 @@ def _align_features(input_records: List[Dict[str, Any]], feature_columns: List[s
     X_aligned = X.reindex(columns=feature_columns, fill_value=0)
     # Ensure numeric dtype for model input
     X_aligned = X_aligned.astype(float)
+
+    # Replace any remaining non-finite values (nan, inf) with safe defaults
+    X_aligned = X_aligned.replace([np.inf, -np.inf], np.nan).fillna(0.0)
+
     return X_aligned
+
+
+def _is_finite_number(x: Any) -> bool:
+    """Return True if x is a finite number."""
+    try:
+        return isinstance(x, (int, float, np.floating)) and math.isfinite(float(x))
+    except Exception:
+        return False
+
+
+def _sanitize_number(x: Any) -> Any:
+    """Convert non-finite numeric values (nan/inf) to None; pass through other JSON-safe scalars."""
+    if isinstance(x, (np.integer,)):
+        return int(x)
+    if isinstance(x, (np.floating, float, int)):
+        return float(x) if _is_finite_number(x) else None
+    if isinstance(x, (np.bool_, bool)):
+        return bool(x)
+    # Strings and other JSON-safe types pass through as-is
+    return x
+
+
+def _sanitize_array(arr: Any) -> List[Any]:
+    """Convert numpy arrays or sequences to plain Python lists and sanitize elements."""
+    if isinstance(arr, np.ndarray):
+        arr = arr.tolist()
+    if isinstance(arr, (list, tuple)):
+        return [_sanitize_number(v) if not isinstance(v, (list, tuple)) else _sanitize_array(v) for v in arr]
+    # Single scalar
+    return [_sanitize_number(arr)]
+
+
+def _sanitize_result_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensure the result dict contains only JSON-serializable, finite values."""
+    out: Dict[str, Any] = {}
+
+    # Required simple fields
+    out["model_id"] = str(payload.get("model_id") or "")
+    out["task_type"] = str(payload.get("task_type") or "")
+    out["count"] = int(payload.get("count") or 0)
+
+    # Predictions
+    preds = payload.get("predictions", [])
+    preds = preds.tolist() if isinstance(preds, np.ndarray) else list(preds)
+    out["predictions"] = [_sanitize_number(v) for v in preds]
+
+    # Probabilities (optional)
+    probas = payload.get("probabilities", None)
+    if probas is not None:
+        if isinstance(probas, np.ndarray):
+            probas = probas.tolist()
+        # Ensure 2D list and sanitize
+        if isinstance(probas, list):
+            out["probabilities"] = [
+                [_sanitize_number(v) for v in (row if isinstance(row, list) else [row])]
+                for row in probas
+            ]
+        else:
+            out["probabilities"] = None
+    else:
+        out["probabilities"] = None
+
+    # Classes (optional)
+    classes = payload.get("classes", None)
+    if classes is not None:
+        try:
+            out["classes"] = [str(c) for c in (classes.tolist() if isinstance(classes, np.ndarray) else list(classes))]
+        except Exception:
+            out["classes"] = None
+    else:
+        out["classes"] = None
+
+    return out
 
 
 # PUBLIC_INTERFACE
@@ -158,6 +236,7 @@ def predict_with_latest_model(records: List[Dict[str, Any]]) -> Dict[str, Any]:
 
     # Run model prediction
     preds = model.predict(X)
+
     result: Dict[str, Any] = {
         "model_id": meta.get("model_id"),
         "task_type": meta.get("task_type"),
@@ -169,12 +248,14 @@ def predict_with_latest_model(records: List[Dict[str, Any]]) -> Dict[str, Any]:
     if hasattr(model, "predict_proba"):
         try:
             probas = model.predict_proba(X)
-            # Convert to list of lists; include class order if available
             result["probabilities"] = probas.tolist()
             if hasattr(model, "classes_"):
                 result["classes"] = [str(c) for c in list(model.classes_)]
         except Exception:
             # If fails, silently ignore proba
-            pass
+            result["probabilities"] = None
+            result["classes"] = result.get("classes", None)
 
-    return result
+    # Sanitize the payload to ensure JSON-serializable, finite values
+    safe_result = _sanitize_result_payload(result)
+    return safe_result

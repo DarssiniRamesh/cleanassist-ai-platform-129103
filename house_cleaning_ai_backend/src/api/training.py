@@ -153,6 +153,25 @@ def _train_model(X: pd.DataFrame, y: pd.Series, task_type: Optional[str] = None)
     return model, task_type, metrics
 
 
+def _to_json_safe(value):
+    """Recursively convert NaN/Inf and numpy types in a structure into JSON-safe Python types."""
+    import math
+    if isinstance(value, dict):
+        return {str(k): _to_json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_to_json_safe(v) for v in value]
+    if isinstance(value, tuple):
+        return [_to_json_safe(v) for v in value]
+    # numpy types
+    if isinstance(value, (np.integer,)):
+        return int(value)
+    if isinstance(value, (np.floating, float)):
+        return float(value) if math.isfinite(float(value)) else None
+    if isinstance(value, (np.bool_, bool)):
+        return bool(value)
+    return value
+
+
 def _store_artifact(model, meta: Dict[str, Union[str, int, float]]) -> TrainingResult:
     """Store model with joblib and write metadata to companion JSON."""
     model_id = meta.get("model_id") or str(uuid.uuid4())
@@ -162,17 +181,20 @@ def _store_artifact(model, meta: Dict[str, Union[str, int, float]]) -> TrainingR
     model_path = os.path.join(MODELS_DIR, model_filename)
     meta_path = os.path.join(MODELS_DIR, meta_filename)
 
+    # Ensure meta (metrics especially) is JSON-safe (no NaN/Inf)
+    safe_meta = _to_json_safe(meta)
+
     joblib.dump(model, model_path)
     with open(meta_path, "w", encoding="utf-8") as f:
-        json.dump(meta, f, indent=2)
+        json.dump(safe_meta, f, indent=2)
 
     return TrainingResult(
         model_id=model_id,
         model_path=model_path,
-        task_type=str(meta.get("task_type")),
-        target_column=str(meta.get("target_column")),
-        metrics=meta.get("metrics", {}),
-        created_at=str(meta.get("created_at")),
+        task_type=str(safe_meta.get("task_type")),
+        target_column=str(safe_meta.get("target_column")),
+        metrics=safe_meta.get("metrics", {}),
+        created_at=str(safe_meta.get("created_at")),
     )
 
 
