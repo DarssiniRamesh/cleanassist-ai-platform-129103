@@ -74,6 +74,37 @@ def health_check():
 
 
 # PUBLIC_INTERFACE
+@app.get(
+    "/api-docs-info",
+    tags=["Health"],
+    summary="API usage help (docs and endpoints)",
+    description="Usage notes and links for this API, including how to call POST /ai/train and /ai/infer."
+)
+def api_docs_info():
+    """Provide quick instructions for using the API and links to OpenAPI docs."""
+    return {
+        "message": "CleanAssist AI Backend is running.",
+        "docs": "/docs",
+        "openapi": "/openapi.json",
+        "endpoints": {
+            "train": {
+                "method": "POST",
+                "path": "/ai/train",
+                "content_type": "multipart/form-data",
+                "fields": ["file", "target_column (optional)", "task_type (optional)"],
+            },
+            "infer": {
+                "method": "POST",
+                "path": "/ai/infer",
+                "content_type": "application/json",
+                "body_example": {"records": [{"feature1": 1, "feature2": "A"}]},
+            },
+        },
+        "note": "If you see 'Cannot POST /ai/train', ensure your request is sent to this backend service URL (not a frontend URL) and that the server is running.",
+    }
+
+
+# PUBLIC_INTERFACE
 @app.post(
     "/ai/train",
     tags=["AI Training"],
@@ -181,3 +212,14 @@ async def infer_endpoint(payload: InferenceRequest = Body(...)) -> JSONResponse:
         raise HTTPException(status_code=400, detail=str(ve)) from ve
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Inference failed: {e}") from e
+
+
+if __name__ == "__main__":
+    # Allow running the API directly with: python -m src.api.main
+    # Avoid hardcoding host/port in code; rely on environment variables if provided.
+    import os
+    import uvicorn
+
+    host = os.environ.get("HOST", "0.0.0.0")
+    port = int(os.environ.get("PORT", "8000"))
+    uvicorn.run("src.api.main:app", host=host, port=port, reload=False)

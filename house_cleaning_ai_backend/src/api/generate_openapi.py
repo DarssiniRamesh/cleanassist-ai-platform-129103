@@ -7,8 +7,9 @@ from src.api.main import app
 Generate and write the OpenAPI schema to interfaces/openapi.json.
 
 Run this script after updating routes to keep the interface spec in sync.
+Usage:
+    python -m src.api.generate_openapi
 """
-
 # Get the OpenAPI schema
 openapi_schema = app.openapi()
 
