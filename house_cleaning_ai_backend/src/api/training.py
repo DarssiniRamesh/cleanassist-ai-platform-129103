@@ -63,8 +63,9 @@ def _prepare_features(df: pd.DataFrame, target_column: str) -> Tuple[pd.DataFram
     # - Fill numeric NaN with median
     # - Fill categorical NaN with mode
     # - One-hot encode categoricals
-    numeric_cols = X.select_dtypes(include=["int64", "float64", "int32", "float32"]).columns.tolist()
-    categorical_cols = X.select_dtypes(exclude=["int64", "float64", "int32", "float32"]).columns.tolist()
+    # Treat boolean as numeric to keep it as a simple 0/1 feature
+    numeric_cols = X.select_dtypes(include=["int64", "float64", "int32", "float32", "bool"]).columns.tolist()
+    categorical_cols = X.columns.difference(numeric_cols).tolist()
 
     X_num = X[numeric_cols].copy() if numeric_cols else pd.DataFrame(index=X.index)
     for col in X_num.columns:
@@ -114,10 +115,19 @@ def _train_model(X: pd.DataFrame, y: pd.Series, task_type: Optional[str] = None)
     if task_type is None:
         task_type = _infer_task_type(y)
 
-    # Ensure numeric types for features (get_dummies returns numeric; enforce)
-    X = X.astype(float) if not np.issubdtype(X.dtypes, np.number).all() else X
+    # Ensure numeric types for features (get_dummies returns numeric; enforce).
+    # The previous check used np.issubdtype on a Series and then .all(), which can yield a bool and trigger
+    # "'bool' object has no attribute 'all'". Use a safe per-column dtype check instead.
+    all_numeric = all(np.issubdtype(dt, np.number) for dt in X.dtypes)
+    X = X.astype(float) if not all_numeric else X
 
     # Train/validation split
+    if isinstance(y, pd.DataFrame):
+        if y.shape[1] != 1:
+            raise ValueError("Target must be a single column.")
+        y = y.iloc[:, 0]
+    if len(X) != len(y):
+        raise ValueError(f"Mismatch between features ({len(X)}) and target ({len(y)}).")
     X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
 
     if task_type == "classification":
