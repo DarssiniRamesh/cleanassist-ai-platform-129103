@@ -65,6 +65,9 @@ class InferenceRequest(BaseModel):
 class RecommendedMinutesResponse(BaseModel):
     """Minimal response containing only the recommended cleaning time in minutes."""
     recommended_minutes: int = Field(..., description="Recommended cleaning duration in minutes.")
+    # Provide additional context for debugging/model lineage
+    model_id: str | None = Field(default=None, description="Model artifact ID used for prediction.")
+    target_column: str | None = Field(default=None, description="Target column that the model was trained to predict.")
 
 
 @app.get("/", tags=["Health"], summary="Health Check")
@@ -211,7 +214,19 @@ async def infer_endpoint(payload: InferenceRequest = Body(...)) -> JSONResponse:
             raise HTTPException(status_code=400, detail="records must be a non-empty list.")
 
         minutes = predict_recommended_minutes(records=payload.records)
-        response = RecommendedMinutesResponse(recommended_minutes=minutes)
+
+        # Also surface model_id and target_column for transparency
+        # Load meta from latest model
+        from src.api.inference import _get_latest_model_paths, _read_metadata  # local import to avoid circulars
+
+        _model_path, _meta_path = _get_latest_model_paths()
+        _meta = _read_metadata(_meta_path)
+
+        response = RecommendedMinutesResponse(
+            recommended_minutes=minutes,
+            model_id=str(_meta.get("model_id")),
+            target_column=str(_meta.get("target_column")),
+        )
         return JSONResponse(status_code=200, content=response.model_dump())
     except (ValidationError, FileNotFoundError) as err:
         detail = str(err)

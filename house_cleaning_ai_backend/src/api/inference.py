@@ -150,6 +150,29 @@ def predict_recommended_minutes(records: List[Dict[str, Any]]) -> int:
     if not feature_columns:
         raise ValueError("Model metadata missing feature_columns; cannot align input.")
 
+    target_col = str(meta.get("target_column", "")).lower().strip()
+    if not target_col:
+        raise ValueError("Model metadata missing target_column; cannot ensure correct scaling.")
+
+    # Ensure we are predicting a time-based target; otherwise, abort with guidance
+    time_like_indicators = [
+        "duration_minutes",
+        "cleaning_minutes",
+        "minutes",
+        "estimated_minutes",
+        "time_minutes",
+        "duration",
+        "time",
+        "cleaning_time",
+        "estimated_time",
+    ]
+    if not any(ind == target_col for ind in time_like_indicators):
+        # If the model does not target a time column, it's likely to mis-scale recommendations.
+        raise ValueError(
+            f"Latest model target '{meta.get('target_column')}' is not a time-based column. "
+            "Retrain specifying a time-based target_column (e.g., duration_minutes)."
+        )
+
     if not records:
         raise ValueError("Empty input: provide at least one record.")
 

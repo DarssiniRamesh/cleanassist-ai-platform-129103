@@ -222,11 +222,35 @@ def train_from_upload(
     """
     df = _read_uploaded_to_dataframe(file_bytes, filename)
 
-    # If target column unspecified, default to last column
+    # If target column unspecified, auto-select a likely time-based target; else default to last column
     if target_column is None:
         if df.shape[1] < 2:
             raise ValueError("Dataset must have at least two columns (features + target).")
-        target_column = df.columns[-1]
+        # Heuristics: prefer duration/time columns over others
+        lower_cols = [c.lower() for c in df.columns]
+        candidate_order = [
+            "duration_minutes",
+            "cleaning_minutes",
+            "minutes",
+            "estimated_minutes",
+            "time_minutes",
+            "duration",
+            "time",
+            "cleaning_time",
+            "estimated_time",
+        ]
+        chosen = None
+        for name in candidate_order:
+            if name in lower_cols:
+                chosen = df.columns[lower_cols.index(name)]
+                break
+        # Fallback: choose last numeric column if available
+        if chosen is None:
+            numeric_cols = df.select_dtypes(include=["int64", "float64", "int32", "float32"]).columns.tolist()
+            if len(numeric_cols) >= 1:
+                chosen = numeric_cols[-1]
+        # Final fallback: last column
+        target_column = chosen if chosen is not None else df.columns[-1]
 
     X, y = _prepare_features(df, target_column)
     model, inferred_task_type, metrics = _train_model(X, y, task_type=task_type)
