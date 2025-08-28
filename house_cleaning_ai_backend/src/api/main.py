@@ -85,10 +85,16 @@ def health_check():
 )
 def api_docs_info():
     """Provide quick instructions for using the API and links to OpenAPI docs."""
+    import os
+    base_url = os.environ.get("BASE_URL", "http://localhost:8000")
     return {
         "message": "CleanAssist AI Backend is running.",
         "docs": "/docs",
         "openapi": "/openapi.json",
+        "configuration": {
+            "BASE_URL": base_url,
+            "usage": "Clients should prefix API calls with BASE_URL, e.g., {BASE_URL}/ai/infer",
+        },
         "endpoints": {
             "train": {
                 "method": "POST",
