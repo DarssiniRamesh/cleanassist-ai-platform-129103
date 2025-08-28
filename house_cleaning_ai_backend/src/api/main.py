@@ -11,6 +11,30 @@ openapi_tags = [
     {
         "name": "Health",
         "description": "Service health and status endpoints.",
+    }
+
+# PUBLIC_INTERFACE
+@app.get(
+    "/config/runtime",
+    tags=["Health"],
+    summary="Runtime configuration (CORS and base URL)",
+    description="Returns current CORS settings and BASE_URL as seen by the backend. Useful for debugging frontend connectivity."
+)
+def runtime_config():
+    """
+    Return runtime configuration values relevant to frontend connectivity.
+
+    Returns:
+        JSON with BASE_URL and allowed CORS origins list.
+    """
+    import os
+    base_url = os.environ.get("BASE_URL", "http://localhost:8000")
+    cors_env = os.environ.get("CORS_ALLOW_ORIGINS", "*")
+    cors_list = ["*"] if cors_env.strip() == "*" else [o.strip() for o in cors_env.split(",") if o.strip()]
+    return {
+        "BASE_URL": base_url,
+        "CORS_ALLOW_ORIGINS": cors_list,
+        "notes": "Set CORS_ALLOW_ORIGINS to explicit origins in production. Ensure frontend REACT_APP_BASE_URL points to BASE_URL with matching protocol."
     },
     {
         "name": "AI Training",
@@ -28,9 +52,18 @@ app = FastAPI(
     openapi_tags=openapi_tags,
 )
 
+# Configure CORS using environment variable CORS_ALLOW_ORIGINS.
+# Defaults to permissive "*" for development; recommend setting explicit origins in production.
+import os as _os
+_cors_env = _os.environ.get("CORS_ALLOW_ORIGINS", "*")
+if _cors_env.strip() == "*":
+    allowed_origins = ["*"]
+else:
+    allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -85,10 +118,16 @@ def health_check():
 )
 def api_docs_info():
     """Provide quick instructions for using the API and links to OpenAPI docs."""
+    import os
+    base_url = os.environ.get("BASE_URL", "http://localhost:8000")
     return {
         "message": "CleanAssist AI Backend is running.",
         "docs": "/docs",
         "openapi": "/openapi.json",
+        "configuration": {
+            "BASE_URL": base_url,
+            "usage": "Clients should prefix API calls with BASE_URL, e.g., {BASE_URL}/ai/infer",
+        },
         "endpoints": {
             "train": {
                 "method": "POST",
