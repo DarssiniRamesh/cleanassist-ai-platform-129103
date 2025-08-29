@@ -7,34 +7,11 @@ from typing import Any, Dict, List
 from src.api.training import TrainingResult, train_from_upload
 from src.api.inference import predict_recommended_minutes
 
+# Properly define OpenAPI tags list
 openapi_tags = [
     {
         "name": "Health",
         "description": "Service health and status endpoints.",
-    }
-
-# PUBLIC_INTERFACE
-@app.get(
-    "/config/runtime",
-    tags=["Health"],
-    summary="Runtime configuration (CORS and base URL)",
-    description="Returns current CORS settings and BASE_URL as seen by the backend. Useful for debugging frontend connectivity."
-)
-def runtime_config():
-    """
-    Return runtime configuration values relevant to frontend connectivity.
-
-    Returns:
-        JSON with BASE_URL and allowed CORS origins list.
-    """
-    import os
-    base_url = os.environ.get("BASE_URL", "http://localhost:8000")
-    cors_env = os.environ.get("CORS_ALLOW_ORIGINS", "*")
-    cors_list = ["*"] if cors_env.strip() == "*" else [o.strip() for o in cors_env.split(",") if o.strip()]
-    return {
-        "BASE_URL": base_url,
-        "CORS_ALLOW_ORIGINS": cors_list,
-        "notes": "Set CORS_ALLOW_ORIGINS to explicit origins in production. Ensure frontend REACT_APP_BASE_URL points to BASE_URL with matching protocol."
     },
     {
         "name": "AI Training",
@@ -42,6 +19,7 @@ def runtime_config():
     },
 ]
 
+# Initialize FastAPI app before using decorators
 app = FastAPI(
     title="CleanAssist AI Backend",
     description=(
@@ -107,6 +85,31 @@ class RecommendedMinutesResponse(BaseModel):
 def health_check():
     """Simple endpoint to verify the service is running."""
     return {"message": "Healthy"}
+
+
+# PUBLIC_INTERFACE
+@app.get(
+    "/config/runtime",
+    tags=["Health"],
+    summary="Runtime configuration (CORS and base URL)",
+    description="Returns current CORS settings and BASE_URL as seen by the backend. Useful for debugging frontend connectivity."
+)
+def runtime_config():
+    """
+    Return runtime configuration values relevant to frontend connectivity.
+
+    Returns:
+        JSON with BASE_URL and allowed CORS origins list.
+    """
+    import os
+    base_url = os.environ.get("BASE_URL", "http://localhost:8000")
+    cors_env = os.environ.get("CORS_ALLOW_ORIGINS", "*")
+    cors_list = ["*"] if cors_env.strip() == "*" else [o.strip() for o in cors_env.split(",") if o.strip()]
+    return {
+        "BASE_URL": base_url,
+        "CORS_ALLOW_ORIGINS": cors_list,
+        "notes": "Set CORS_ALLOW_ORIGINS to explicit origins in production. Ensure frontend REACT_APP_BASE_URL points to BASE_URL with matching protocol."
+    }
 
 
 # PUBLIC_INTERFACE
