@@ -7,34 +7,11 @@ from typing import Any, Dict, List
 from src.api.training import TrainingResult, train_from_upload
 from src.api.inference import predict_recommended_minutes
 
+# Properly define OpenAPI tags list
 openapi_tags = [
     {
         "name": "Health",
         "description": "Service health and status endpoints.",
-    }
-
-# PUBLIC_INTERFACE
-@app.get(
-    "/config/runtime",
-    tags=["Health"],
-    summary="Runtime configuration (CORS and base URL)",
-    description="Returns current CORS settings and BASE_URL as seen by the backend. Useful for debugging frontend connectivity."
-)
-def runtime_config():
-    """
-    Return runtime configuration values relevant to frontend connectivity.
-
-    Returns:
-        JSON with BASE_URL and allowed CORS origins list.
-    """
-    import os
-    base_url = os.environ.get("BASE_URL", "http://localhost:8000")
-    cors_env = os.environ.get("CORS_ALLOW_ORIGINS", "*")
-    cors_list = ["*"] if cors_env.strip() == "*" else [o.strip() for o in cors_env.split(",") if o.strip()]
-    return {
-        "BASE_URL": base_url,
-        "CORS_ALLOW_ORIGINS": cors_list,
-        "notes": "Set CORS_ALLOW_ORIGINS to explicit origins in production. Ensure frontend REACT_APP_BASE_URL points to BASE_URL with matching protocol."
     },
     {
         "name": "AI Training",
@@ -42,6 +19,7 @@ def runtime_config():
     },
 ]
 
+# Initialize FastAPI app before using decorators
 app = FastAPI(
     title="CleanAssist AI Backend",
     description=(
@@ -52,21 +30,31 @@ app = FastAPI(
     openapi_tags=openapi_tags,
 )
 
-# Configure CORS using environment variable CORS_ALLOW_ORIGINS.
-# Defaults to permissive "*" for development; recommend setting explicit origins in production.
+# Configure CORS.
+# Notes:
+# - If credentials (cookies/auth) are not needed from browsers, keep allow_credentials=False and you may use wildcard "*".
+# - If credentials are needed, you MUST enumerate exact origins; "*" is not permitted by browsers with credentials.
 import os as _os
-_cors_env = _os.environ.get("CORS_ALLOW_ORIGINS", "*")
-if _cors_env.strip() == "*":
-    allowed_origins = ["*"]
-else:
-    allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
 
+# Env var CORS_ALLOW_ORIGINS takes precedence if provided (comma-separated list)
+_cors_env = _os.environ.get("CORS_ALLOW_ORIGINS", "").strip()
+
+if _cors_env:
+    allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+else:
+    # Default to wildcard to prevent CORS issues during preview/dev. Safe because allow_credentials=False.
+    allowed_origins = ["*"]
+
+# Do not require cookies: credentials False
+# Allow all methods including OPTIONS for preflight; allow all headers.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=600,
 )
 
 
@@ -107,6 +95,46 @@ class RecommendedMinutesResponse(BaseModel):
 def health_check():
     """Simple endpoint to verify the service is running."""
     return {"message": "Healthy"}
+
+
+# PUBLIC_INTERFACE
+@app.get(
+    "/config/runtime",
+    tags=["Health"],
+    summary="Runtime configuration (CORS and base URL)",
+    description="Returns current CORS settings and BASE_URL as seen by the backend. Useful for debugging frontend connectivity."
+)
+def runtime_config():
+    """
+    Return runtime configuration values relevant to frontend connectivity.
+
+    Returns:
+        JSON with BASE_URL and allowed CORS origins list.
+    """
+    import os
+    base_url = os.environ.get("BASE_URL", "http://localhost:8000")
+    cors_env = os.environ.get("CORS_ALLOW_ORIGINS", "").strip()
+    frontend_env = os.environ.get("FRONTEND_BASE_URL", "unset")
+    if cors_env:
+        cors_list = [o.strip() for o in cors_env.split(",") if o.strip()]
+        source = "CORS_ALLOW_ORIGINS env"
+    else:
+        cors_list = ["*"]
+        source = "default wildcard (*)"
+    return {
+        "BASE_URL": base_url,
+        "FRONTEND_BASE_URL": frontend_env,
+        "CORS_ALLOW_ORIGINS_EVALUATED": cors_list,
+        "CORS_SOURCE": source,
+        "CORS_ALLOW_CREDENTIALS": False,
+        "CORS_ALLOW_METHODS": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        "CORS_ALLOW_HEADERS": ["*"],
+        "notes": (
+            "Set CORS_ALLOW_ORIGINS to explicit origins (comma-separated) in production, "
+            "or FRONTEND_BASE_URL to auto-include your dashboard origin. "
+            "Ensure the frontend uses the correct BASE_URL for API calls (scheme/host/port must match)."
+        ),
+    }
 
 
 # PUBLIC_INTERFACE
