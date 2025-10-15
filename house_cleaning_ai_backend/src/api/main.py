@@ -30,44 +30,21 @@ app = FastAPI(
     openapi_tags=openapi_tags,
 )
 
-# Configure CORS.
-# Notes:
-# - If credentials (cookies/auth) are not needed from browsers, keep allow_credentials=False and you may use wildcard "*".
-# - If credentials are needed, you MUST enumerate exact origins; "*" is not permitted by browsers with credentials.
+# Configure CORS using environment variable CORS_ALLOW_ORIGINS.
+# Defaults to permissive "*" for development; recommend setting explicit origins in production.
 import os as _os
-
-_default_frontend = "https://vscode-internal-30807-beta.beta01.cloud.kavia.ai:3000"
-_frontend_env = _os.environ.get("FRONTEND_BASE_URL", _default_frontend)
-
-# Env var CORS_ALLOW_ORIGINS takes precedence if provided (comma-separated list)
-_cors_env = _os.environ.get("CORS_ALLOW_ORIGINS", "").strip()
-
-if _cors_env:
-    allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+_cors_env = _os.environ.get("CORS_ALLOW_ORIGINS", "*")
+if _cors_env.strip() == "*":
+    allowed_origins = ["*"]
 else:
-    # Build a sensible default set of allowed origins including the current dashboard URL,
-    # public beta site, and local dev.
-    allowed_origins = sorted(
-        {
-            _frontend_env,
-            "https://beta.kavia.ai",
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-        }
-    )
+    allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
 
-# CORS: allow credentials for browser-based apps; must enumerate explicit origins (no "*")
-# Allow standard methods including OPTIONS for preflight; allow all headers.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins if allowed_origins else [],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
-    max_age=600,
 )
 
 
@@ -126,36 +103,12 @@ def runtime_config():
     """
     import os
     base_url = os.environ.get("BASE_URL", "http://localhost:8000")
-    cors_env = os.environ.get("CORS_ALLOW_ORIGINS", "").strip()
-    frontend_env = os.environ.get("FRONTEND_BASE_URL", "unset")
-    if cors_env:
-        cors_list = [o.strip() for o in cors_env.split(",") if o.strip()]
-        source = "CORS_ALLOW_ORIGINS env"
-    else:
-        cors_list = list(
-            {
-                frontend_env if frontend_env != "unset" else "",
-                "http://localhost:3000",
-                "http://127.0.0.1:3000",
-                "http://localhost:5173",
-                "http://127.0.0.1:5173",
-            }
-        )
-        cors_list = [o for o in cors_list if o]
-        source = "defaults (FRONTEND_BASE_URL + localhost dev)"
+    cors_env = os.environ.get("CORS_ALLOW_ORIGINS", "*")
+    cors_list = ["*"] if cors_env.strip() == "*" else [o.strip() for o in cors_env.split(",") if o.strip()]
     return {
         "BASE_URL": base_url,
-        "FRONTEND_BASE_URL": frontend_env,
-        "CORS_ALLOW_ORIGINS_EVALUATED": cors_list,
-        "CORS_SOURCE": source,
-        "CORS_ALLOW_CREDENTIALS": True,
-        "CORS_ALLOW_METHODS": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        "CORS_ALLOW_HEADERS": ["*"],
-        "notes": (
-            "Set CORS_ALLOW_ORIGINS to explicit origins (comma-separated) in production, "
-            "or FRONTEND_BASE_URL to auto-include your dashboard origin. "
-            "Ensure the frontend uses the correct BASE_URL for API calls (scheme/host/port must match)."
-        ),
+        "CORS_ALLOW_ORIGINS": cors_list,
+        "notes": "Set CORS_ALLOW_ORIGINS to explicit origins in production. Ensure frontend REACT_APP_BASE_URL points to BASE_URL with matching protocol."
     }
 
 
