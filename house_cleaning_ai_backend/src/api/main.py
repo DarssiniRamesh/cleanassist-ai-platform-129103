@@ -45,10 +45,12 @@ _cors_env = _os.environ.get("CORS_ALLOW_ORIGINS", "").strip()
 if _cors_env:
     allowed_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
 else:
-    # Build a sensible default set of allowed origins including the current dashboard URL and local dev.
-    allowed_origins = list(
+    # Build a sensible default set of allowed origins including the current dashboard URL,
+    # public beta site, and local dev.
+    allowed_origins = sorted(
         {
             _frontend_env,
+            "https://beta.kavia.ai",
             "http://localhost:3000",
             "http://127.0.0.1:3000",
             "http://localhost:5173",
@@ -56,13 +58,13 @@ else:
         }
     )
 
-# Per acceptance criteria, do not require cookies: credentials False
+# CORS: allow credentials for browser-based apps; must enumerate explicit origins (no "*")
 # Allow standard methods including OPTIONS for preflight; allow all headers.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins if allowed_origins else ["*"],
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_origins=allowed_origins if allowed_origins else [],
+    allow_credentials=True,
+    allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
     max_age=600,
@@ -146,7 +148,7 @@ def runtime_config():
         "FRONTEND_BASE_URL": frontend_env,
         "CORS_ALLOW_ORIGINS_EVALUATED": cors_list,
         "CORS_SOURCE": source,
-        "CORS_ALLOW_CREDENTIALS": False,
+        "CORS_ALLOW_CREDENTIALS": True,
         "CORS_ALLOW_METHODS": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         "CORS_ALLOW_HEADERS": ["*"],
         "notes": (
