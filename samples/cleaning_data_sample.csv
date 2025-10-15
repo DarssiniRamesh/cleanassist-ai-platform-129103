@@ -1,0 +1,26 @@
+household_id,date,home_size_sqft,rooms_count,occupants_count,pets_count,flooring_types,allergy_sensitivity,clutter_level,last_cleaned_days_ago,requested_services,cleaning_duration_minutes,products_used,equipment_used,surfaces_notes,stains_present,dirt_level_before,dirt_level_after,satisfaction_rating,cost_usd,location_zip,frequency_preference,time_window,special_requests,chemical_sensitivity_notes
+H001,2025-05-02,850,3,2,0,hardwood;tile,0,2,10,dusting;vacuum,75,eco_duster;all-purpose_spray,corded_vacuum,Light dust on shelves,0,2,1,5,85.00,94107,biweekly,8-12,, 
+H002,2025-07-14,1600,5,4,1,carpet;tile,1,3,21,dusting;vacuum;bathrooms,110,fragrance_free_cleaner;bathroom_scrub,bagless_vacuum;mop,"Soap scum in shower",1,3,2,4,145.50,10001,monthly,12-16,Focus on kids' playroom,Fragrance-free only
+H003,2025-03-28,1200,4,3,2,hardwood,0,2,7,vacuum;mop,80,wood_floor_cleaner,stick_vacuum;mop,Pet hair around sofa,0,3,2,5,95.00,73301,biweekly,8-12,, 
+H004,2024-12-09,2200,6,5,2,hardwood;tile,1,4,30,dusting;vacuum;deep_kitchen;bathrooms,160,fragrance_free_cleaner;degreaser;glass_cleaner,canister_vacuum;mop;steam_cleaner,"Grease on stove hood",1,4,2,4,210.00,60601,monthly,12-16,Inside oven if possible,No bleach
+H005,2025-01-17,650,2,1,0,tile,0,1,5,dusting;vacuum,55,all-purpose_spray,hand_vacuum,Small studio,0,2,1,5,60.00,02139,weekly,16-20,, 
+H006,2025-06-03,1850,5,4,1,carpet;hardwood,0,3,12,dusting;vacuum;windows,120,glass_cleaner;all-purpose_spray,upright_vacuum;extension_duster,"Fingerprints on patio door",0,3,2,5,150.00,94107,monthly,8-12,, 
+H007,2024-11-22,950,3,2,1,carpet,1,2,8,vacuum;bathrooms,85,fragrance_free_cleaner,bagless_vacuum,"Mildew starting in tub",1,3,2,4,95.50,10001,biweekly,12-16,,Fragrance-free only
+H008,2025-08-20,1400,4,2,0,hardwood;tile,0,2,9,dusting;vacuum;mop,90,wood_floor_cleaner;all-purpose_spray,stick_vacuum;mop,"Dusty baseboards",0,2,1,5,110.00,73301,biweekly,8-12,, 
+H009,2025-04-11,2000,5,3,2,carpet;tile,0,3,18,dusting;vacuum;deep_kitchen,150,degreaser;all-purpose_spray,canister_vacuum;steam_cleaner,Grease splatters on backsplash,1,4,2,4,195.00,60601,monthly,12-16,Deep clean fridge exterior, 
+H010,2025-02-05,780,2,1,0,hardwood,0,1,4,dusting;vacuum,50,wood_floor_cleaner,hand_vacuum,Entryway dust,0,2,1,5,58.00,02139,weekly,8-12,, 
+H011,2025-07-02,2400,6,5,3,hardwood;tile,1,5,35,dusting;vacuum;deep_kitchen;windows;bathrooms,185,fragrance_free_cleaner;degreaser;glass_cleaner,canister_vacuum;mop;steam_cleaner;extension_duster,"High fingerprints on windows; sticky counters",1,5,3,4,235.00,94107,monthly,12-16,Extra attention to allergy zones,No bleach or strong scents
+H012,2025-05-19,1100,3,2,1,carpet;tile,0,2,6,vacuum;dusting,70,all-purpose_spray,bagless_vacuum,Light pet hair,0,2,1,5,80.00,10001,biweekly,8-12,, 
+H013,2025-03-10,1750,4,3,0,hardwood,0,3,14,dusting;vacuum;bathrooms,115,all-purpose_spray;bathroom_scrub,stick_vacuum;mop,"Calcium spots in shower",1,3,2,4,135.00,73301,monthly,12-16,, 
+H014,2024-11-08,900,3,1,0,tile,0,1,3,dusting;vacuum,55,all-purpose_spray,corded_vacuum,Cobwebs near ceiling,0,2,1,5,62.00,60601,weekly,8-12,, 
+H015,2025-06-28,2100,5,4,2,carpet;hardwood,1,4,20,dusting;vacuum;deep_kitchen;bathrooms,165,fragrance_free_cleaner;degreaser,bagless_vacuum;mop;steam_cleaner,"Sticky oven racks",1,4,2,4,205.00,02139,monthly,12-16,Oven interior if time allows,Fragrance-free only
+H016,2025-01-29,1300,4,2,0,hardwood;tile,0,2,9,dusting;vacuum;mop,95,wood_floor_cleaner,stick_vacuum;mop,"Smudges on stainless appliances",0,2,1,5,112.00,94107,biweekly,8-12,, 
+H017,2025-08-01,1550,5,3,1,carpet,0,3,15,dusting;vacuum;windows,120,glass_cleaner,canister_vacuum;extension_duster,Window tracks dusty,0,3,2,5,148.00,10001,monthly,12-16,, 
+H018,2024-12-20,700,2,1,0,tile,0,1,5,dusting;vacuum,50,all-purpose_spray,hand_vacuum,Bathroom mirror streaks,0,2,1,5,55.00,73301,weekly,8-12,, 
+H019,2025-04-25,1950,5,4,2,hardwood;tile,1,4,22,dusting;vacuum;deep_kitchen,155,fragrance_free_cleaner;degreaser,bagless_vacuum;steam_cleaner,"Grease buildup under range",1,4,2,4,198.00,60601,monthly,12-16,Child-safe products only,Fragrance-free only
+H020,2025-02-21,1000,3,2,0,carpet,0,2,10,vacuum;dusting,70,all-purpose_spray,corded_vacuum,Light hallway dust,0,2,1,5,78.00,02139,biweekly,8-12,, 
+H021,2025-07-26,2300,6,5,2,hardwood;tile,1,5,33,dusting;vacuum;deep_kitchen;windows;bathrooms,190,fragrance_free_cleaner;degreaser;glass_cleaner,canister_vacuum;mop;steam_cleaner;extension_duster,"High dust on ceiling fans; tough oven grease",1,5,3,4,240.00,94107,monthly,12-16,HEPA vacuum preferred,No bleach or ammonia
+H022,2025-05-11,1350,4,3,1,carpet;tile,0,3,13,dusting;vacuum;bathrooms,110,all-purpose_spray;bathroom_scrub,bagless_vacuum;mop,"Water spots on fixtures",1,3,2,4,130.00,10001,monthly,8-12,, 
+H023,2025-03-04,880,3,2,0,hardwood,0,2,9,dusting;vacuum,65,wood_floor_cleaner,stick_vacuum,"Dusty blinds",0,2,1,5,72.00,73301,biweekly,12-16,, 
+H024,2024-11-29,2050,5,3,1,hardwood;tile,0,3,16,dusting;vacuum;deep_kitchen,150,degreaser;all-purpose_spray,canister_vacuum;steam_cleaner,"Range hood filter greasy",1,4,2,4,192.00,60601,monthly,8-12,Focus on kitchen surfaces, 
+H025,2025-06-12,1500,4,2,0,carpet;tile,0,2,8,dusting;vacuum;mop,95,all-purpose_spray,bagless_vacuum;mop,"Scuff marks near entry",0,2,1,5,118.00,02139,biweekly,12-16,, 
